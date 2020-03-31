@@ -1,16 +1,12 @@
 """
     complement(g)
-
 Return the [graph complement](https://en.wikipedia.org/wiki/Complement_graph)
 of a graph
-
 ### Implementation Notes
 Preserves the `eltype` of the input graph.
-
 # Examples
 ```jldoctest
 julia> g = SimpleDiGraph([0 1 0 0 0; 0 0 1 0 0; 1 0 0 1 0; 0 0 0 0 1; 0 0 0 1 0]);
-
 julia> foreach(println, edges(complement(g)))
 Edge 1 => 3
 Edge 1 => 4
@@ -54,17 +50,13 @@ end
 
 """
     reverse(g)
-
 Return a directed graph where all edges are reversed from the
 original directed graph.
-
 ### Implementation Notes
 Preserves the eltype of the input graph.
-
 # Examples
 ```jldoctest
 julia> g = SimpleDiGraph([0 1 0 0 0; 0 0 1 0 0; 1 0 0 1 0; 0 0 0 0 1; 0 0 0 1 0]);
-
 julia> foreach(println, edges(reverse(g)))
 Edge 1 => 3
 Edge 2 => 1
@@ -87,7 +79,6 @@ end
 
 """
     reverse!(g)
-
 In-place reverse of a directed graph (modifies the original graph).
 See [`reverse`](@ref) for a non-modifying version.
 """
@@ -99,23 +90,17 @@ end
 
 """
     blockdiag(g, h)
-
 Return a graph with ``|V(g)| + |V(h)|`` vertices and ``|E(g)| + |E(h)|``
 edges where the vertices and edges from graph `h` are appended to graph `g`.
-
 ### Implementation Notes
 Preserves the eltype of the input graph. Will error if the
 number of vertices in the generated graph exceeds the `eltype`.
-
 # Examples
 ```jldoctest
 julia> g1 = SimpleDiGraph([0 1 0 0 0; 0 0 1 0 0; 1 0 0 1 0; 0 0 0 0 1; 0 0 0 1 0]);
-
 julia> g2 = SimpleDiGraph([0 1 0; 0 0 1; 1 0 0]);
-
 julia> blockdiag(g1, g2)
 {8, 9} directed simple Int64 graph
-
 julia> foreach(println, edges(blockdiag(g1, g2)))
 Edge 1 => 2
 Edge 2 => 3
@@ -142,19 +127,14 @@ end
 
 """
     intersect(g, h)
-
 Return a graph with edges that are only in both graph `g` and graph `h`.
-
 ### Implementation Notes
 This function may produce a graph with 0-degree vertices.
 Preserves the eltype of the input graph.
-
 # Examples
 ```jldoctest
 julia> g1 = SimpleDiGraph([0 1 0 0 0; 0 0 1 0 0; 1 0 0 1 0; 0 0 0 0 1; 0 0 0 1 0]);
-
 julia> g2 = SimpleDiGraph([0 1 0; 0 0 1; 1 0 0]);
-
 julia> foreach(println, edges(intersect(g1, g2)))
 Edge 1 => 2
 Edge 2 => 3
@@ -174,19 +154,14 @@ end
 
 """
     difference(g, h)
-
 Return a graph with edges in graph `g` that are not in graph `h`.
-
 ### Implementation Notes
 Note that this function may produce a graph with 0-degree vertices.
 Preserves the `eltype` of the input graph.
-
 # Examples
 ```jldoctest
 julia> g1 = SimpleDiGraph([0 1 0 0 0; 0 0 1 0 0; 1 0 0 1 0; 0 0 0 0 1; 0 0 0 1 0]);
-
 julia> g2 = SimpleDiGraph([0 1 0; 0 0 1; 1 0 0]);
-
 julia> foreach(println, edges(difference(g1, g2)))
 Edge 3 => 4
 Edge 4 => 5
@@ -206,29 +181,20 @@ end
 
 """
     symmetric_difference(g, h)
-
 Return a graph with edges from graph `g` that do not exist in graph `h`,
 and vice versa.
-
 ### Implementation Notes
 Note that this function may produce a graph with 0-degree vertices.
 Preserves the eltype of the input graph. Will error if the
 number of vertices in the generated graph exceeds the eltype.
-
 # Examples
 ```jldoctest
 julia> using LightGraphs
-
 julia> g = SimpleGraph(3); h = SimpleGraph(3);
-
 julia> add_edge!(g, 1, 2);
-
 julia> add_edge!(h, 1, 3);
-
 julia> add_edge!(h, 2, 3);
-
 julia> f = symmetric_difference(g, h);
-
 julia> collect(edges(f))
 3-element Array{LightGraphs.SimpleGraphs.SimpleEdge{Int64},1}:
  Edge 1 => 2
@@ -236,48 +202,136 @@ julia> collect(edges(f))
  Edge 2 => 3
 ```
 """
-function symmetric_difference(g::T, h::T) where T <: AbstractGraph
-    gnv = nv(g)
-    hnv = nv(h)
-
-    r = T(max(gnv, hnv))
-    for e in edges(g)
-        !has_edge(h, e) && add_edge!(r, e)
+function symmetric_difference(g::T, h::T) where T <: SimpleDiGraph
+    limit = min(nv(g), nv(h))
+    r = SimpleGraph(max(nv(g), nv(h)))
+    for u in 1:limit
+        ptr1 = one(eltype(h))
+        ptr2 = one(eltype(h))
+        gnv = length(neighbors(g, u))
+        hnv = length(neighbors(h, u))
+        l1 = outneighbors(g, u)
+        l2 = outneighbors(h, u)
+        while ptr1 <= gnv && ptr2 <= hnv
+            if l1[ptr1] < l2[ptr2]
+                while ptr1 <= gnv && l1[ptr1] < l2[ptr2]
+                    add_edge!(r, u, l1[ptr1])
+                    ptr1 += 1
+                end
+            else
+                while ptr2 <= hnv && l1[ptr1] > l2[ptr2]
+                    add_edge!(r, u, l2[ptr2])
+                    ptr2 += 1
+                end
+            end
+            if ptr1 <= gnv && ptr2 <= hnv && l1[ptr1] == l2[ptr2]
+                ptr1 += 1
+                ptr2 += 1
+            end
+        end
+        while ptr2 <= hnv
+            add_edge!(r, u, l2[ptr2])
+            ptr2 += 1
+        end
+        while ptr1 <= gnv
+            add_edge!(r, u, l1[ptr1])
+            ptr1 += 1
+        end
     end
-    for e in edges(h)
-        !has_edge(g, e) && add_edge!(r, e)
+    if limit < nv(g)
+        for u in limit+1:nv(g)
+            for v in neighbors(g, u)
+                add_edge!(r, u, v)
+            end
+        end
+    end
+    if limit < nv(h)
+        for u in limit+1:nv(h)
+            for v in neighbors(h, u)
+                add_edge!(r, u, v)
+            end
+        end
+    end
+    return r
+end
+
+function symmetric_difference(g::T, h::T) where T <: SimpleGraph
+    limit = min(nv(g), nv(h))
+    r = SimpleDiGraph(max(nv(g), nv(h)))
+    for u in 1:limit
+        gnv = length(neighbors(g, u))
+        hnv = length(neighbors(h, u))
+        l1 = outneighbors(g, u)
+        l2 = outneighbors(h, u)
+        ptr1 = searchsortedfirst(l1, u)
+        ptr2 = searchsortedfirst(l2, u)
+        while ptr1 <= gnv && ptr2 <= hnv
+            if l1[ptr1] < l2[ptr2]
+                while ptr1 <= gnv && l1[ptr1] < l2[ptr2]
+                    add_edge!(r, u, l1[ptr1])
+                    ptr1 += 1
+                end
+            else
+                while ptr2 <= hnv && l1[ptr1] > l2[ptr2]
+                    add_edge!(r, u, l2[ptr2])
+                    ptr2 += 1
+                end
+            end
+            if ptr1 <= gnv && ptr2 <= hnv && l1[ptr1] == l2[ptr2]
+                ptr1 += 1
+                ptr2 += 1
+            end
+        end
+        while ptr2 <= hnv
+            add_edge!(r, u, l2[ptr2])
+            ptr2 += 1
+        end
+        while ptr1 <= gnv
+            add_edge!(r, u, l1[ptr1])
+            ptr1 += 1
+        end
+    end
+    if limit < nv(g)
+
+        for u in limit+1:nv(g)
+            l1 = neighbors(g, u)
+            i = searchsortedfirst(l1, u)
+            while i <= length(l1)
+                add_edge!(r, u, l1[i])
+                i += 1
+            end
+        end
+    end
+    if limit < nv(h)
+        for u in limit+1:nv(h)
+            l1 = neighbors(h, u)
+            i = searchsortedfirst(l1, u)
+            while i <= length(l1)
+                add_edge!(r, u, l1[i])
+                i += 1
+            end
+        end
     end
     return r
 end
 
 """
     union(g, h)
-
 Return a graph that combines graphs `g` and `h` by taking the set union
 of all vertices and edges.
-
 ### Implementation Notes
 Preserves the eltype of the input graph. Will error if the
 number of vertices in the generated graph exceeds the eltype.
-
 # Examples
 ```jldoctest
 julia> using LightGraphs
-
 julia> g = SimpleGraph(3); h = SimpleGraph(5);
-
 julia> add_edge!(g, 1, 2);
-
 julia> add_edge!(g, 1, 3);
-
 julia> add_edge!(h, 3, 4);
-
 julia> add_edge!(h, 3, 5);
-
 julia> add_edge!(h, 4, 5);
-
 julia> f = union(g, h);
-
 julia> collect(edges(f))
 5-element Array{LightGraphs.SimpleGraphs.SimpleEdge{Int64},1}:
  Edge 1 => 2
@@ -308,21 +362,16 @@ end
 
 """
     join(g, h)
-
 Return a graph that combines graphs `g` and `h` using `blockdiag` and then
 adds all the edges between the vertices in `g` and those in `h`.
-
 ### Implementation Notes
 Preserves the eltype of the input graph. Will error if the number of vertices
 in the generated graph exceeds the eltype.
-
 # Examples
 ```jldoctest
 julia> using LightGraphs
-
 julia> g = join(star_graph(3), path_graph(2))
 {5, 9} undirected simple Int64 graph
-
 julia> collect(edges(g))
 9-element Array{LightGraphs.SimpleGraphs.SimpleEdge{Int64},1}:
  Edge 1 => 2
@@ -349,21 +398,16 @@ end
 
 """
     crosspath(len::Integer, g::Graph)
-
 Return a graph that duplicates `g` `len` times and connects each vertex
 with its copies in a path.
-
 ### Implementation Notes
 Preserves the eltype of the input graph. Will error if the number of vertices
 in the generated graph exceeds the eltype.
-
 # Examples
 ```jldoctest
 julia> using LightGraphs
-
 julia> g = crosspath(3, path_graph(3))
 {9, 12} undirected simple Int64 graph
-
 julia> collect(edges(g))
 12-element Array{LightGraphs.SimpleGraphs.SimpleEdge{Int64},1}:
  Edge 1 => 2
@@ -417,13 +461,10 @@ end
 
 """
     sum(g, i)
-
 Return a vector of indegree (`i`=1) or outdegree (`i`=2) values for graph `g`.
-
 # Examples
 ```jldoctest
 julia> g = SimpleDiGraph([0 1 0 0 0; 0 0 1 0 0; 1 0 0 1 0; 0 0 0 0 1; 0 0 0 1 0]);
-
 julia> sum(g, 2)
 5-element Array{Int64,1}:
  1
@@ -431,7 +472,6 @@ julia> sum(g, 2)
  2
  1
  1
-
 julia> sum(g, 1)
 5-element Array{Int64,1}:
  1
@@ -451,21 +491,15 @@ end
 size(g::AbstractGraph) = (nv(g), nv(g))
 """
     size(g, i)
-
 Return the number of vertices in `g` if `i`=1 or `i`=2, or `1` otherwise.
-
 # Examples
 ```jldoctest
 julia> using LightGraphs
-
 julia> g = cycle_graph(4);
-
 julia> size(g, 1)
 4
-
 julia> size(g, 2)
 4
-
 julia> size(g, 3)
 1
 ```
@@ -474,13 +508,10 @@ size(g::Graph, dim::Int) = (dim == 1 || dim == 2) ? nv(g) : 1
 
 """
     sum(g)
-
 Return the number of edges in `g`.
-
 # Examples
 ```jldoctest
 julia> g = SimpleGraph([0 1 0; 1 0 1; 0 1 0]);
-
 julia> sum(g)
 2
 ```
@@ -489,7 +520,6 @@ sum(g::AbstractGraph) = ne(g)
 
 """
     sparse(g)
-
 Return the default adjacency matrix of `g`.
 """
 sparse(g::AbstractGraph) = adjacency_matrix(g)
@@ -500,21 +530,16 @@ issymmetric(g::AbstractGraph) = !is_directed(g)
 
 """
     cartesian_product(g, h)
-
 Return the [cartesian product](https://en.wikipedia.org/wiki/Cartesian_product_of_graphs)
 of `g` and `h`.
-
 ### Implementation Notes
 Preserves the eltype of the input graph. Will error if the number of vertices
 in the generated graph exceeds the eltype.
-
 # Examples
 ```jldoctest
 julia> using LightGraphs
-
 julia> g = cartesian_product(star_graph(3), path_graph(3))
 {9, 12} undirected simple Int64 graph
-
 julia> collect(edges(g))
 12-element Array{LightGraphs.SimpleGraphs.SimpleEdge{Int64},1}:
  Edge 1 => 2
@@ -552,21 +577,16 @@ end
 
 """
     tensor_product(g, h)
-
 Return the [tensor product](https://en.wikipedia.org/wiki/Tensor_product_of_graphs)
 of `g` and `h`.
-
 ### Implementation Notes
 Preserves the eltype of the input graph. Will error if the number of vertices
 in the generated graph exceeds the eltype.
-
 # Examples
 ```jldoctest
 julia> using LightGraphs
-
 julia> g = tensor_product(star_graph(3), path_graph(3))
 {9, 8} undirected simple Int64 graph
-
 julia> collect(edges(g))
 8-element Array{LightGraphs.SimpleGraphs.SimpleEdge{Int64},1}:
  Edge 1 => 5
@@ -602,37 +622,24 @@ end
 """
     induced_subgraph(g, vlist)
     induced_subgraph(g, elist)
-
 Return the subgraph of `g` induced by the vertices in  `vlist` or edges in `elist`
 along with a vector mapping the new vertices to the old ones
 (the  vertex `i` in the subgraph corresponds to the vertex `vmap[i]` in `g`.)
-
 The returned graph has `length(vlist)` vertices, with the new vertex `i`
 corresponding to the vertex of the original graph in the `i`-th position
 of `vlist`.
-
 ### Usage Examples
 ```doctestjl
 julia> g = complete_graph(10)
-
 julia> sg, vmap = induced_subgraph(g, 5:8)
-
 julia> @assert g[5:8] == sg
-
 julia> @assert nv(sg) == 4
-
 julia> @assert ne(sg) == 6
-
 julia> @assert vm[4] == 8
-
 julia> sg, vmap = induced_subgraph(g, [2,8,3,4])
-
 julia> @assert sg == g[[2,8,3,4]]
-
 julia> elist = [Edge(1,2), Edge(3,4), Edge(4,8)]
-
 julia> sg, vmap = induced_subgraph(g, elist)
-
 julia> @assert sg == g[elist]
 ```
 """
@@ -682,7 +689,6 @@ end
 
 """
     g[iter]
-
 Return the subgraph induced by `iter`.
 Equivalent to [`induced_subgraph`](@ref)`(g, iter)[1]`.
 """
@@ -692,11 +698,9 @@ getindex(g::AbstractGraph, iter) = induced_subgraph(g, iter)[1]
 """
     egonet(g, v, d)
     egonet(g, v, d, distmx)
-
 Return the subgraph of `g` induced by the neighbors of `v` up to distance
 `d`, using weights (optionally) provided by `distmx`.
 This is equivalent to [`induced_subgraph`](@ref)`(g, neighborhood(g, v, d, dir=dir))[1].`
-
 ### Optional Arguments
 - `dir=:out`: if `g` is directed, this argument specifies the edge direction
 with respect to `v` (i.e. `:in` or `:out`).
@@ -709,7 +713,6 @@ egonet(g::AbstractGraph{T}, v::Integer, d::Integer; dir=:out) where T <: Integer
 
 """
     compute_shifts(n::Int, x::AbstractArray)
-
 Determine how many elements of `x` are less than `i` for all `i` in `1:n`.
 """
 function compute_shifts(n::Integer, x::AbstractArray)
@@ -720,24 +723,18 @@ end
 
 """
     merge_vertices(g::AbstractGraph, vs)
-
 Create a new graph where all vertices in `vs` have been aliased to the same vertex `minimum(vs)`.
-
 # Examples
 ```jldoctest
 julia> using LightGraphs
-
 julia> g = path_graph(5);
-
 julia> collect(edges(g))
 4-element Array{LightGraphs.SimpleGraphs.SimpleEdge{Int64},1}:
  Edge 1 => 2
  Edge 2 => 3
  Edge 3 => 4
  Edge 4 => 5
-
 julia> h = merge_vertices(g, [2, 3]);
-
 julia> collect(edges(h))
 3-element Array{LightGraphs.SimpleGraphs.SimpleEdge{Int64},1}:
  Edge 1 => 2
@@ -775,26 +772,20 @@ end
 
 """
     merge_vertices!(g, vs)
-
 Combine vertices specified in `vs` into single vertex whose
 index will be the lowest value in `vs`. All edges connected to vertices in `vs`
 connect to the new merged vertex.
-
 Return a vector with new vertex values are indexed by the original vertex indices.
-
 # Examples
 ```jldoctest
 julia> using LightGraphs
-
 julia> g = path_graph(5);
-
 julia> collect(edges(g))
 4-element Array{LightGraphs.SimpleGraphs.SimpleEdge{Int64},1}:
  Edge 1 => 2
  Edge 2 => 3
  Edge 3 => 4
  Edge 4 => 5
-
 julia> merge_vertices!(g, [2, 3])
 5-element Array{Int64,1}:
  1
@@ -802,7 +793,6 @@ julia> merge_vertices!(g, [2, 3])
  2
  3
  4
-
 julia> collect(edges(g))
 3-element Array{LightGraphs.SimpleGraphs.SimpleEdge{Int64},1}:
  Edge 1 => 2
